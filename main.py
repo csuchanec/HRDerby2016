@@ -3,6 +3,16 @@ from datetime import datetime
 import mlbgame
 import mlbgame.update
 
+#configure the set-up. Not well factored
+year = 2016
+
+mlbgame.update.run(start="04-01-2016")
+
+season_start_date = datetime(year, 04, 03)
+today_date = datetime.today()
+
+
+# Crappy way to map the month around
 class Month:
     def __init__(self, name, id):
         self.name = name
@@ -31,9 +41,11 @@ class Player:
 
 players_dict = {}
 
-#Hand mapped in these players - not sure where the ID comes from but found by listing out all the players and finding the players.
-#No Cannonical naming in a way I could trust to write code. Something in the original data source probably
-#has th einformation I was looking for
+#Hand mapped in these players -  ID comes from mlb.com player ID
+#No Cannonical naming in a way I could trust to write code to match based upon name.
+#This is obviously annoying for the future. Probably can build the data of all players
+#in a programatic way in the future (create a CSV and map that in here rather 
+#than do it by hand)
 players = [Player("Bryce", "Harper", 547180),
 Player("Mookie", "Betts", 605141),
 Player("Miguel", "Sano", 593934),
@@ -67,43 +79,41 @@ class User:
         self.players = players
 
 
+#TODO: Take this mapping and make it read from a text file
 users = [User("Dave", [519317, 425902, 444432, 621043, 408234, 656941, 596748]),
 User("Craig", [547180, 605141, 593934, 545341, 543807, 596059, 570731]),
 User("Brian", [519317, 592178, 425902, 593934, 408234, 656941, 592206]),
 User("Jason", [519317, 430945, 592178, 593934, 475582, 656941, 608365])]
 
 
-mlbgame.update.run(start="01-01-2016")
-
-season_start_date = datetime(2016, 04, 02)
 
 for m in months:
-    month = mlbgame.games(2016, m.id)
+    month = mlbgame.games(year, m.id)
 
     for games in month:
         for game in games:
-            if game.date > season_start_date:
-                #Try catch is the prefered way of checking in python? Really? I hate this, 
+            #Only games in the season (pre-season games will be included without this)
+            #Also don't try to pull games that have not been played yet as the record
+            #will exist but the call to get the stats will fail
+            if game.date > season_start_date and game.date < today_date:
+                #Try check is here because postponed games will still come through
+                #Need to figure out if there is a way to deal with this actively rather than passively
                 try:
                     stats = mlbgame.player_stats(game.game_id)
                     game_stats_all = mlbgame.combine_stats(stats)
                     for game_stats in game_stats_all:
 
-                        try:
+                        if hasattr(game_stats, 'hr') and game_stats.id in players_dict:
                             p = players_dict[game_stats.id]
                             p.hr_total += game_stats.hr
                             p.hrs[m.id - 4] += game_stats.hr #-4 to map April to 0 index this is a shitty way to do this
 
-                        except KeyError:
-                            x = 1 #Just to have a statement
-
-                except AttributeError:
-                    print('error')
                 except ValueError:
-                    y = 1 # Just to have a statement
+                    print("Game not found:", game.game_id)
 
-for player in players:
-    print(player.first_name, player.last_name, player.hrs, "Total:", player.hr_total)
+# For debugging purposes, print out player totals
+#for player in players:
+#    print(player.first_name, player.last_name, player.hrs, "Total:", player.hr_total)
 
 
 print()

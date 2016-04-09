@@ -1,4 +1,5 @@
 from __future__ import print_function
+from datetime import datetime
 import mlbgame
 import mlbgame.update
 
@@ -74,30 +75,32 @@ User("Jason", [519317, 430945, 592178, 593934, 475582, 656941, 608365])]
 
 mlbgame.update.run(start="01-01-2016")
 
+season_start_date = datetime(2016, 04, 02)
+
 for m in months:
     month = mlbgame.games(2016, m.id)
 
     for games in month:
         for game in games:
-            #Try catch is the prefered way of checking in python? Really? I hate this, 
-            try:
-                stats = mlbgame.player_stats(game.game_id)
-                game_stats_all = mlbgame.combine_stats(stats)
-                for game_stats in game_stats_all:
+            if game.date > season_start_date:
+                #Try catch is the prefered way of checking in python? Really? I hate this, 
+                try:
+                    stats = mlbgame.player_stats(game.game_id)
+                    game_stats_all = mlbgame.combine_stats(stats)
+                    for game_stats in game_stats_all:
 
-                    try:
-                        #print(game_stats.id, game_stats.name)
-                        p = players_dict[game_stats.id]
-                        p.hr_total += game_stats.hr
-                        p.hrs[m.id - 4] += game_stats.hr #-4 to map April to 0 index this is a shitty way to do this
+                        try:
+                            p = players_dict[game_stats.id]
+                            p.hr_total += game_stats.hr
+                            p.hrs[m.id - 4] += game_stats.hr #-4 to map April to 0 index this is a shitty way to do this
 
-                    except KeyError:
-                        x = 1 #Just to have a statement
+                        except KeyError:
+                            x = 1 #Just to have a statement
 
-            except AttributeError:
-                print('error')
-            except ValueError:
-                y = 1 # Just to have a statement
+                except AttributeError:
+                    print('error')
+                except ValueError:
+                    y = 1 # Just to have a statement
 
 for player in players:
     print(player.first_name, player.last_name, player.hrs, "Total:", player.hr_total)

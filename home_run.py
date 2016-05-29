@@ -3,12 +3,15 @@ from datetime import datetime
 import mlbgame
 import mlbgame.update
 
+from pandas import DataFrame, Series
+import pandas as pd 
+
 #configure the set-up. Not well factored
 year = 2016
 
 mlbgame.update.run(start="04-01-2016")
 
-season_start_date = datetime(year, 04, 04) # Adjust because presason games
+season_start_date = datetime(year, 04, 03)
 today_date = datetime.today()
 
 
@@ -32,12 +35,32 @@ class Player:
         self.id = id
         self.hrs = [0,0,0,0,0,0] #One for each month of the game
         self.hr_total = 0
+        self.hr_series = Series()
+        self.hr_total_series = Series()
 
-    def add_hrs(hrs):
-        self.hr_total += hrs
+    def __str__(self):
+        return str.format('{0} : {1}', self.id, self.last_name)
 
-    def name():
-        return first_name + " " + last_name
+    def __repr__(self):
+        return self.__str__()
+
+    def add_hrs(self, count, date):
+        self.hr_total += count
+        self.hr_total_series[date] = self.hr_series.sum() + count
+        if(self.hr_series.last_valid_index() == date ):
+            self.hr_series[date] = count + self.hr_series[date]
+        else:
+            self.hr_series[date] = count
+
+
+    def name(self):
+        return self.first_name + " " + self.last_name
+
+    def get_player_hr_dataframe(self):
+        return self.hr_series.to_frame(self.name())
+
+    def get_player_hr_total_dataframe(self):
+        return self.hr_total_series.to_frame(self.name())
 
 players_dict = {}
 
@@ -71,19 +94,34 @@ Player("Addison", "Russell", 608365)
 for player in players:
     players_dict[player.id] = player
 
+def create_multiplayer_hr_dataframe(players_dataframes):
+    return pd.concat(players_dataframes, axis=1).fillna(value=0)
 
+def create_multiplayer_hr_total_dataframe(players_dataframes):
+    return pd.concat(players_dataframes, axis=1).fillna(method='ffill').fillna(value=0)
 
 class User:
-    def __init__(self, name, players):
+    def __init__(self, name, playerIds, players_dict):
         self.name = name
-        self.players = players
+        self.playerIds = playerIds
+        self.players = []
+        for p in self.playerIds:
+            self.players.append(players_dict[p])
+
+    def players_hr_dataframe(self):
+        dataframes = map(lambda p : p.get_player_hr_dataframe(), self.players)
+        return create_multiplayer_hr_dataframe(dataframes)
+
+    def players_hr_total_dataframe(self):
+        dataframes = map(lambda p : p.get_player_hr_total_dataframe(), self.players)
+        return create_multiplayer_hr_total_dataframe(dataframes)
 
 
 #TODO: Take this mapping and make it read from a text file
-users = [User("Dave", [519317, 425902, 444432, 621043, 408234, 656941, 596748]),
-User("Craig", [547180, 605141, 593934, 545341, 543807, 596059, 570731]),
-User("Brian", [519317, 592178, 425902, 593934, 408234, 656941, 592206]),
-User("Jason", [519317, 430945, 592178, 593934, 475582, 656941, 608365])]
+users = [User("Dave", [519317, 425902, 444432, 621043, 408234, 656941, 596748], players_dict),
+User("Craig", [547180, 605141, 593934, 545341, 543807, 596059, 570731], players_dict),
+User("Brian", [519317, 592178, 425902, 593934, 408234, 656941, 592206], players_dict),
+User("Jason", [519317, 430945, 592178, 593934, 475582, 656941, 608365], players_dict)]
 
 
 
@@ -105,7 +143,7 @@ for m in months:
 
                         if hasattr(game_stats, 'hr') and game_stats.id in players_dict:
                             p = players_dict[game_stats.id]
-                            p.hr_total += game_stats.hr
+                            p.add_hrs(game_stats.hr, Period(game.date, freq='D'))
                             p.hrs[m.id - 4] += game_stats.hr #-4 to map April to 0 index this is a shitty way to do this
 
                 except ValueError:
@@ -120,14 +158,14 @@ print()
 
 def user_month_total(user, month):
     total = 0
-    for p in user.players:
+    for p in user.playerIds:
         player = players_dict[p]
         total += player.hrs[month]
     return total
 
 def user_total(user):
     total = 0
-    for p in user.players:
+    for p in user.playerIds:
         player = players_dict[p]
         total += sum(player.hrs)
     return total
